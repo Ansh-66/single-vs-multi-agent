@@ -1,0 +1,9 @@
+# The agents: Groq through its OpenAI-compatible API
+openai
+python-dotenv
+
+# Needed by the Insurance Graph RAG modules imported through GRAPH_RAG_DIR
+pydantic
+json-repair
+numpy
+sentence-transformers
