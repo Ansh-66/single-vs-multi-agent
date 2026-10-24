@@ -45,9 +45,21 @@ Spike prompt, whole question: 1,270 tokens over 2 LLM calls and 1 tool call.
 
 6. **The model passed names, not the question.** It sent "Prudential Bharti Life" although the schema's example was a full question. Parameter descriptions are guidance, not instructions. Here it makes no difference, because `find_seeds` handles both.
 
-7. **Repeat runs were identical.** Running the spike prompt twice gave the same arguments, the same answer and the same token counts, reasoning included. This was 2 runs of 1 question; it supports caching, but it does not show that Groq is deterministic in general. Only the tool call ids differed, which confirms that ids are opaque and must be copied, never parsed.
+7. **Repeat runs were identical twice, then not.** Running the spike prompt twice gave the same arguments, the same answer and the same token counts, reasoning included; only the tool call ids differed, which confirms that ids are opaque and must be copied, never parsed. A third run of the identical request (same 374 prompt tokens), made on 2026-10-25 when the cache was added, behaved differently: the model answered "The sources do not say." straight away, without calling `find_entities` (180 completion tokens, 165 of them reasoning). Temperature 0 does not make Groq deterministic. See the next section.
 
 8. **Wall time includes Groq queue time** of 0.21 to 0.35 s per call, which depends on Groq's load rather than on the design. Reported wall times should say so.
+
+## Temperature 0 is not deterministic
+
+The third run of call 1 skipped the tool and refused directly. The answer happens to be the right one for this question, but it was reached without looking anything up: in the failure taxonomy it is a missed lookup, and it would score as correct but ungrounded.
+
+Because `spike.py` is straight-line code rather than a loop, it then made call 2 anyway, with the model's own answer and an empty `tool_calls` list in the history. Groq accepted the empty list, and in call 2 the model called `find_entities` after all. The agent loop must stop when a response has no tool calls, and must leave the `tool_calls` key out when it is empty.
+
+What this means for the project:
+
+- **One recorded run per arm is the honest unit.** The same question can take different paths on different runs, so results come from the cache's single recorded run, not from re-running until a result looks right.
+- **Deleting cache entries to get a better answer is cherry-picking.** A run that went badly is a result.
+- **Answers need checking for grounding, not only correctness.** A correct refusal reached without any tool call is not the same result as one reached after looking.
 
 ## The `get_edges` failure
 

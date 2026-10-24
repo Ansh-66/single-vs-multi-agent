@@ -5,6 +5,7 @@ import sys
 import json
 import time
 from openai import OpenAI
+from cache import cached_completion
 
 
 ROOT = Path(__file__).resolve().parent
@@ -76,13 +77,19 @@ messages = [
 ]
 
 start = time.perf_counter()
-response = client.chat.completions.create(
-    model = MODEL,
-    messages = messages,
-    tools = TOOLS,
-    temperature = 0,
+result = cached_completion(
+    client,
+    model=MODEL,
+    messages=messages,
+    tools=TOOLS,
+    temperature=0,
 )
+response = result.response
+print("cache_hit:", result.cache_hit)
 elapsed = time.perf_counter() - start
+if result.error:
+    print("rejected:", result.error)
+    raise SystemExit
 
 choice = response.choices[0]
 message = choice.message
@@ -124,13 +131,19 @@ for call in message.tool_calls or []:
     })
 
 start = time.perf_counter()
-response2 = client.chat.completions.create(
+result2 = cached_completion(
+    client,
     model=MODEL,
     messages=messages,
     tools=TOOLS,
     temperature=0,
 )
+response2 = result2.response
+print("cache_hit:", result2.cache_hit)
 elapsed2 = time.perf_counter() - start
+if result2.error:
+    print("rejected:", result2.error)
+    raise SystemExit
 
 choice2 = response2.choices[0]
 message2 = choice2.message
