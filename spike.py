@@ -4,20 +4,18 @@ from pathlib import Path
 import sys
 import json
 import time
-from openai import OpenAI
 from cache import cached_completion
+from config import MODEL, SEED, TEMPERATURE, make_client
 
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
 
 GRAPH_RAG_DIR = os.environ["GRAPH_RAG_DIR"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 sys.path.append(str(Path(GRAPH_RAG_DIR) / "src"))
 import retrieve
 
-client =  OpenAI(base_url = "https://api.groq.com/openai/v1", api_key = GROQ_API_KEY)
-MODEL = "openai/gpt-oss-120b"
+client = make_client()
 
 
 def find_entities(text):
@@ -82,7 +80,8 @@ result = cached_completion(
     model=MODEL,
     messages=messages,
     tools=TOOLS,
-    temperature=0,
+    temperature=TEMPERATURE,
+    seed=SEED,
 )
 response = result.response
 print("cache_hit:", result.cache_hit)
@@ -136,7 +135,8 @@ result2 = cached_completion(
     model=MODEL,
     messages=messages,
     tools=TOOLS,
-    temperature=0,
+    temperature=TEMPERATURE,
+    seed=SEED,
 )
 response2 = result2.response
 print("cache_hit:", result2.cache_hit)

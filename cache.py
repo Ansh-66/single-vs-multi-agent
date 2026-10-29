@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,6 +42,7 @@ class CallResult:
     error: dict | None                # {"code", "message", "failed_generation"} for tool_use_failed
     cache_hit: bool
     key: str
+    elapsed: float | None             # seconds the ORIGINAL call took, also on a hit
 
 
 def cache_key(request):
@@ -76,7 +78,8 @@ def _from_record(record, key, hit):
     # SDK itself accepted when the call was made.
     response = (ChatCompletion.construct(**record["response"])
                 if record["response"] is not None else None)
-    return CallResult(response=response, error=record["error"], cache_hit=hit, key=key)
+    return CallResult(response=response, error=record["error"], cache_hit=hit, key=key,
+                      elapsed=record.get("elapsed"))   # .get: records saved before timing was added
 
 
 def cached_completion(client, **request):
@@ -93,6 +96,7 @@ def cached_completion(client, **request):
         record = json.loads(path.read_text(encoding="utf-8"))
         return _from_record(record, key, hit=True)
 
+    start = time.perf_counter()
     try:
         response = client.chat.completions.create(**request)
         record = {"response": response.model_dump(), "error": None}
@@ -105,6 +109,9 @@ def cached_completion(client, **request):
                             "message": body.get("message"),
                             "failed_generation": body.get("failed_generation")}}
 
+    # Store how long the real call took, so a later cache hit reports the
+    # original time instead of ~0 s (otherwise a resumed run looks faster).
+    record["elapsed"] = round(time.perf_counter() - start, 3)
     record["request"] = request        # for debugging; contains no API key
     record["saved_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     _write_atomic(path, record)
@@ -157,7 +164,8 @@ if __name__ == "__main__":
         f = cached_completion(client, **bad)
 
         print("first call     hit:", a.cache_hit, "| content:", a.response.choices[0].message.content)
-        print("same request   hit:", b.cache_hit, "| tokens still reported:", b.response.usage.total_tokens)
+        print("same request   hit:", b.cache_hit, "| tokens still reported:", b.response.usage.total_tokens,
+              "| original time kept:", b.elapsed == a.elapsed)
         print("keys reordered hit:", c.cache_hit)
         print("temperature=1  hit:", d.cache_hit)
         print("tool_use_failed hit:", e.cache_hit, "->", f.cache_hit, "| error:", f.error["code"])
