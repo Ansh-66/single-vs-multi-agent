@@ -107,6 +107,10 @@ def find_entities(text):
 
 
 def graph_neighbours(node_id, hops=DEFAULT_HOPS, other_id=None):
+    if not isinstance(node_id, str):
+        return error(f"node_id must be a string id from find_entities, got {node_id!r}.")
+    if other_id is not None and not isinstance(other_id, str):
+        return error(f"other_id must be a string id from find_entities, got {other_id!r}.")
     if node_id not in NODES:
         return error(f"unknown node id {node_id!r}. Call find_entities to get ids.")
     if other_id is not None and other_id not in NODES:
