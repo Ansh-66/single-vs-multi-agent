@@ -19,6 +19,11 @@ BASE_URL = "https://api.groq.com/openai/v1"
 MODEL = "openai/gpt-oss-120b"
 TEMPERATURE = 0
 
+# Caps per question, identical for every arm. Sized to arm C's normal range
+# (10 to 18 calls, up to about 80k tokens), so only a runaway question hits them.
+MAX_LLM_CALLS = 20
+MAX_TOKENS = 80_000
+
 # Best effort only. Groq: "Determinism is not guaranteed." The spike showed an
 # identical request taking a different path on its third run.
 SEED = 42
